@@ -1,17 +1,24 @@
-# Miorune（米洛恩）
+# Miorune · 米洛恩
 
-> **项目展示名：Miorune · 米洛恩**。基于 Cleos 的非官方二次开发，保留上游项目及贡献者署名。本仓库原名称为 `Cleos-Unofficial-Mod`。
+**一间装进口袋的私人数字世界。**
 
-> **非官方衍生版本**。本仓库由 [opheliaveyra](https://github.com/opheliaveyra) 维护，基于 [jqzhang921-sudo/cleos](https://github.com/jqzhang921-sudo/cleos) 修改，不代表原作者发布或背书。感谢原项目及贡献者。
+Miorune（米洛恩）是由 [opheliaveyra](https://github.com/opheliaveyra) 维护的 Android 原生 AI 陪伴聊天应用，基于开源项目 [Cleos](https://github.com/jqzhang921-sudo/cleos) 进行**非官方二次开发**。使用 Kotlin 与 Jetpack Compose，在保留原项目核心方向的基础上持续探索聊天体验、个性化主题、互动游戏和真机适配。
 
-## 本仓库是什么
+> **来源与署名**：Miorune 是社区衍生项目，并非 Cleos 官方版本，也不代表原作者认可或背书。感谢 Cleos 原作者与所有贡献者；适用版权声明、[Apache-2.0 许可证](LICENSE)、[NOTICE](NOTICE) 及第三方许可均予保留。
 
-这是基于 Cleos 的 Android 原生 AI 陪伴聊天应用二次开发分支，使用 Kotlin 与 Jetpack Compose。保留原项目的核心设计，同时持续进行功能扩展、交互调整与问题修复。
+## 项目概况
 
-- **当前源码版本**：`0.1.92-mod`（从 `app/build.gradle.kts` 读取；安装包版本请以实际发布的 APK 为准）。
-- **Android 最低版本**：Android 10（API 29）。
-- **源码分支**：`feature/chat-file-upload-and-hold-to-talk`（当前仓库默认分支）。
-- **开发状态**：持续迭代的二改版；部分功能可能仍在测试中。
+| 项目 | 说明 |
+| --- | --- |
+| 当前名称 | **Miorune（米洛恩）** |
+| 原仓库名 | `Cleos-Unofficial-Mod`（已原地更名，不影响 Git 历史） |
+| 当前源码版本 | `0.1.92-mod`，以 [app/build.gradle.kts](app/build.gradle.kts) 为准 |
+| Android 支持 | Android 10（API 29）及以上 |
+| 默认开发分支 | `feature/chat-file-upload-and-hold-to-talk` |
+| 项目状态 | 持续迭代，部分功能仍处于实验或测试阶段 |
+| 安装与发布 | 查看 [Releases](https://github.com/opheliaveyra/Miorune/releases)；实际安装包版本以发布资产为准 |
+
+**命名说明**：本次变更只涉及仓库及项目展示名称。Android `applicationId` 仍为 `com.cleo.cleos`，Gradle 根项目名等内部标识也可能继续沿用原名。更改内部标识涉及安装升级与数据迁移，应另行测试，不能当作纯文字替换。
 
 ## 最近在做什么（0.1.66 – 0.1.92）
 
@@ -83,11 +90,11 @@ Android 11（API 30）以下没有公开的虚拟屏 API，入口会直接说明
 
 本仓库采用独立的 `0.x-mod` 版本号，以区别于上游 Cleos 的版本线。二改工作的方向包括聊天附件与交互体验的扩展、功能调整及修复。**具体哪些功能已完成、已发布、可在设备上稳定使用，应以本仓库的提交记录、实际构建与测试结果为准**；不要直接把下方上游说明当作本二改版的完整已验收功能清单。
 
-查看：[本仓库提交历史](https://github.com/opheliaveyra/Cleos-Unofficial-Mod/commits/feature/chat-file-upload-and-hold-to-talk) · [原版项目](https://github.com/jqzhang921-sudo/cleos)
+查看：[本仓库提交历史](https://github.com/opheliaveyra/Miorune/commits/feature/chat-file-upload-and-hold-to-talk) · [原版项目](https://github.com/jqzhang921-sudo/cleos)
 
 ## 下载、安装与更新
 
-请优先查看本仓库的 [Releases](https://github.com/opheliaveyra/Cleos-Unofficial-Mod/releases)。若暂无发布资产，说明当前未在 GitHub Releases 提供可直接下载的 APK，不能将原版的下载渠道视为本二改版的更新地址。
+请优先查看本仓库的 [Releases](https://github.com/opheliaveyra/Miorune/releases)。若暂无发布资产，说明当前未在 GitHub Releases 提供可直接下载的 APK，不能将原版的下载渠道视为本二改版的更新地址。
 
 **更新前请备份应用内数据。** Android 安装包需要匹配应用包名和签名证书；签名不同可能无法覆盖安装，卸载会清除本地应用数据。不要仅凭文件名或版本号判断可以无损升级。
 
