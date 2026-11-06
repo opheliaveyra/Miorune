@@ -1,4 +1,6 @@
-# Cleos 二次开发版（社区修改版）
+# Miorune（米洛恩）
+
+> **项目展示名：Miorune · 米洛恩**。基于 Cleos 的非官方二次开发，保留上游项目及贡献者署名。本仓库原名称为 `Cleos-Unofficial-Mod`。
 
 > **非官方衍生版本**。本仓库由 [opheliaveyra](https://github.com/opheliaveyra) 维护，基于 [jqzhang921-sudo/cleos](https://github.com/jqzhang921-sudo/cleos) 修改，不代表原作者发布或背书。感谢原项目及贡献者。
 
