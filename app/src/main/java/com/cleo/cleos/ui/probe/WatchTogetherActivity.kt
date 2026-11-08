@@ -45,7 +45,8 @@ import java.io.ByteArrayOutputStream
  *
  * 不是让 TA 自己在虚拟屏里刷——是你刷，TA 看同一块屏幕并开口。
  * 需要 MediaProjection 授权（系统弹窗点一次），不需要 Shizuku / root。
- * 每 5 秒最多发一帧，画面没换（字节相同）就跳过，省 token。
+ * 每 20 秒最多发一帧（画面没换就跳过），并限制单次会话最多 15 帧——
+ * 之前 5 秒一帧在刷视频时会把聊天记录刷满，太吵。
  */
 class WatchTogetherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +55,8 @@ class WatchTogetherActivity : ComponentActivity() {
     }
 }
 
-private const val FRAME_INTERVAL_MS = 5_000L
+private const val FRAME_INTERVAL_MS = 20_000L
+private const val MAX_FRAMES = 15
 private const val MAX_WIDTH = 720
 
 @Composable
@@ -122,6 +124,11 @@ private fun WatchTogetherScreen() {
                 bmp.recycle()
                 val signature = jpeg.contentHashCode().toString()
                 if (signature == lastSignature) { scaled.recycle(); return@setOnImageAvailableListener }
+                if (sent >= MAX_FRAMES) {
+                    scaled.recycle()
+                    stopAll("已发满 $MAX_FRAMES 帧，自动停止（想继续就再点开始）")
+                    return@setOnImageAvailableListener
+                }
                 lastSignature = signature
                 lastSentAt = now
                 scope.launch {
@@ -147,7 +154,7 @@ private fun WatchTogetherScreen() {
             r.surface, null, null,
         )
         running = true
-        status = "正在一起看（每 5 秒最多一帧，画面没换就跳过）"
+        status = "正在一起看（每 20 秒最多一帧，画面没换就跳过，最多 15 帧）"
         // 把自己藏到后台：不然截到的都是这个页面，看不到你真正在刷的东西。
         Handler(Looper.getMainLooper()).postDelayed({
             runCatching { (context as? android.app.Activity)?.moveTaskToBack(true) }
@@ -187,7 +194,7 @@ private fun WatchTogetherScreen() {
     ) {
         Text("一起看", fontSize = 20.sp)
         Text(
-            "你刷视频的时候，让 TA 看同一块屏幕并开口。每 5 秒最多一帧，画面没变就跳过；不需要 root / Shizuku。",
+            "你刷视频的时候，让 TA 看同一块屏幕并开口。每 20 秒最多一帧，画面没变就跳过，单次最多发 15 帧；不需要 root / Shizuku。",
             fontSize = 12.sp,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
