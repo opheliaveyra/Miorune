@@ -1,7 +1,6 @@
 package com.cleo.cleos.ui.probe
 
 import android.app.ActivityOptions
-import android.app.Instrumentation
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -14,9 +13,6 @@ import android.media.ImageReader
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
-import android.os.SystemClock
-import android.view.InputDevice
-import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -224,6 +220,10 @@ private fun ProbeScreen() {
         } catch (e: Throwable) {
             add("启动抖音到虚拟屏", false, "App 直接启动失败：${e.javaClass.simpleName}：${e.message ?: "没有说明"}。改用电脑 adb 启动。")
         }
+        // 先 force-stop：抖音若已经在主屏前台跑着，am start 只会把 intent 投给那个实例，
+        // 不会新建到虚拟屏（日志里是 "Activity not started, intent has been delivered to ... top-most instance"）。
+        val (stopped, stopMsg) = shizukuRun("am force-stop $DOUYIN")
+        if (!stopped) { add("Shizuku 启动抖音", false, stopMsg); return }
         val (ok, msg) = shizukuRun("am start --display $displayId -n com.ss.android.ugc.aweme/.splash.SplashActivity")
         add("Shizuku 启动抖音", ok, if (ok) (msg.ifEmpty { "已发出" }) else msg)
     }
@@ -262,26 +262,20 @@ private fun ProbeScreen() {
         }
     }
 
-fun swipe() {
+    fun swipe() {
         if (displayId < 0) { add("向虚拟屏滑动", false, "先创建虚拟屏"); return }
-        // App 自己注入手势预期 SecurityException（保留作对照）；真正的滑动交给电脑 adb。
-        val (ok, msg) = shizukuRun("input -d $displayId swipe ${W / 2} ${(H * 0.8).toInt()} ${W / 2} ${(H * 0.2).toInt()} 300")
-        add("Shizuku 滑动", ok, if (ok) (msg.ifEmpty { "已发出" }) else msg)
-        try {
-            val instrument = Instrumentation()
-            val now = SystemClock.uptimeMillis()
-            fun event(action: Int, x: Float, y: Float) = MotionEvent.obtain(now, SystemClock.uptimeMillis(), action, x, y, 0)
-            val down = event(MotionEvent.ACTION_DOWN, W / 2f, H * 0.8f)
-            val move = event(MotionEvent.ACTION_MOVE, W / 2f, H * 0.2f)
-            val up = event(MotionEvent.ACTION_UP, W / 2f, H * 0.2f)
-            down.source = InputDevice.SOURCE_TOUCHSCREEN
-            instrument.sendPointerSync(down)
-            instrument.sendPointerSync(move)
-            instrument.sendPointerSync(up)
-            add("向虚拟屏滑动", true, "sendPointerSync 没报错（事件很可能落在主屏；要真机看抖音有没有翻页）")
-        } catch (e: Throwable) {
-            add("向虚拟屏滑动", false, "App 直接注入失败：${e.javaClass.simpleName}：${e.message ?: "没有说明"}（需要 INJECT_EVENTS；改用上面的 adb 命令）")
-        }
+        // 实测（华硕 Android 12 + Shizuku）：input -d <displayId> swipe 会在虚拟屏上真的翻页。
+        // 不用 Instrumentation.sendPointerSync：它在主线程上必然抛
+        // "This method can not be called from the main application thread"，而且事件只会落在主屏。
+        val (ok, msg) = shizukuRun(
+            "input -d $displayId swipe ${W / 2} ${(H * 0.8).toInt()} ${W / 2} ${(H * 0.2).toInt()} 300",
+        )
+        add(
+            "向虚拟屏滑动",
+            ok,
+            if (ok) "已执行（退出码 0）。滑动是否生效看画面：再点一次「读取画面」，画面换了就是真翻页了。"
+            else msg,
+        )
     }
 
     fun stop() {
