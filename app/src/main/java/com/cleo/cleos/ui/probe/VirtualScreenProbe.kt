@@ -13,6 +13,7 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.os.Build
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -29,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +42,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import moe.shizuku.server.IShizukuService
+import rikka.shizuku.Shizuku
 import java.io.File
 import kotlin.math.max
 
@@ -63,6 +67,7 @@ private const val SHIZUKU = "moe.shizuku.privileged.api"
 private const val W = 720
 private const val H = 1280
 private const val DPI = 320
+private const val SHIZUKU_REQUEST = 4127
 
 private data class Step(val title: String, val ok: Boolean, val detail: String)
 
@@ -77,12 +82,51 @@ private fun ProbeScreen() {
 
     fun add(title: String, ok: Boolean, detail: String) { steps.add(Step(title, ok, detail)) }
 
-    // Shizuku 集成留到下一版（它的 IShizukuService AIDL 不在公开 api 包里）；
-    // 本版用电脑 adb（与 Shizuku 同一档 ADB 权限），launch/swipe 会把命令写出来。
-    fun shizukuReady(): Boolean = false
-    fun shizukuPermitted(): Boolean = false
-    fun shizukuRun(cmd: String): Pair<Boolean, String> =
-        false to "本版未集成 Shizuku；请在电脑上 adb shell $cmd"
+    // Shizuku：装上它、启动它的服务、并在这里授权之后，本应用就能以 shell 身份执行
+    // am/input 这类命令（和电脑 adb 同一档权限）。没装或没授权时，下面的按钮会说明原因，
+    // 仍然可以在电脑上用 adb 做同样的事。
+    fun shizukuReady(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+    fun shizukuPermitted(): Boolean =
+        shizukuReady() && runCatching {
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+
+    fun shizukuRun(cmd: String): Pair<Boolean, String> {
+        if (!shizukuReady()) {
+            return false to "Shizuku 服务没在跑（打开 Shizuku 点「启动服务」；Android 11+ 第一次要用电脑 adb 启动它）"
+        }
+        if (!shizukuPermitted()) {
+            return false to "还没给 Cleos 授权（点上面的「Shizuku 授权」，在弹窗里允许）"
+        }
+        return runCatching {
+            // Shizuku 的 binder 就是 IShizukuService；由它以 shell 身份开进程。
+            val service = IShizukuService.Stub.asInterface(Shizuku.getBinder())
+            val argv = cmd.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.toTypedArray()
+            val remote = service.newProcess(argv, null, null)
+            val code = remote.waitFor()
+            val out = ParcelFileDescriptor.AutoCloseInputStream(remote.getInputStream())
+                .bufferedReader().use { it.readText() }
+            val err = ParcelFileDescriptor.AutoCloseInputStream(remote.getErrorStream())
+                .bufferedReader().use { it.readText() }
+            (code == 0) to (out + err).trim().ifEmpty { "已执行（退出码 0）" }
+        }.getOrElse {
+            false to "Shizuku 执行失败：${it.javaClass.simpleName}：${it.message ?: "没有说明"}"
+        }
+    }
+
+    fun requestShizukuPermission() {
+        if (!shizukuReady()) {
+            add("Shizuku 授权", false, "Shizuku 服务没在跑：先打开 Shizuku 点「启动服务」（Android 11+ 第一次需要电脑 adb 启动）")
+            return
+        }
+        if (shizukuPermitted()) {
+            add("Shizuku 授权", true, "已经授权过了")
+            return
+        }
+        runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST) }
+            .onSuccess { add("Shizuku 授权", true, "已弹出授权请求，在 Shizuku 的弹窗里点「允许」") }
+            .onFailure { add("Shizuku 授权", false, "请求失败：${it.javaClass.simpleName}：${it.message ?: "没有说明"}") }
+    }
 
     fun createVirtualDisplay(mp: android.media.projection.MediaProjection) {
         try {
@@ -253,6 +297,18 @@ fun swipe() {
         }
     }
 
+    // Shizuku 的授权结果回调：用户点了允许/拒绝之后更新页面。
+    DisposableEffect(Unit) {
+        val listener = Shizuku.OnRequestPermissionResultListener { code, grantResult ->
+            if (code == SHIZUKU_REQUEST) {
+                val granted = grantResult == PackageManager.PERMISSION_GRANTED
+                add("Shizuku 授权", granted, if (granted) "授权成功，可以试「启动抖音」了" else "授权被拒绝")
+            }
+        }
+        Shizuku.addRequestPermissionResultListener(listener)
+        onDispose { Shizuku.removeRequestPermissionResultListener(listener) }
+    }
+
     val diagnostic = remember(steps.size) {
         buildString {
             appendLine("Cleos 虚拟屏探针")
@@ -264,6 +320,7 @@ fun swipe() {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("虚拟屏可行性探针", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Text("只做验证，不参与聊天。每一步都显示真实结果，不会改用主屏。", fontSize = 12.sp)
+        Text("要在这台手机上不插电脑也能启动抖音，先装 Shizuku、启动它的服务，再点「Shizuku 授权」。", fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = ::systemInfo) { Text("系统信息") }
             OutlinedButton(onClick = ::create) { Text("创建虚拟屏") }
@@ -273,9 +330,10 @@ fun swipe() {
             OutlinedButton(onClick = ::frame) { Text("读取画面") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { requestShizukuPermission() }) { Text("Shizuku 授权") }
             OutlinedButton(onClick = ::swipe) { Text("向该屏滑动") }
-            OutlinedButton(onClick = ::stop) { Text("停止释放") }
         }
+        OutlinedButton(onClick = ::stop) { Text("停止释放") }
         OutlinedButton(onClick = {
             val cm = context.getSystemService(ClipboardManager::class.java)
             cm.setPrimaryClip(ClipData.newPlainText("虚拟屏探针", diagnostic))
@@ -291,7 +349,8 @@ fun swipe() {
             Text(s.detail, fontSize = 12.sp, fontFamily = FontFamily.Monospace, lineHeight = 16.sp)
         }
         Text(
-            "预期：未 root 的普通手机上，「创建虚拟屏」多半能成功；「启动抖音到虚拟屏」和「向该屏滑动」会以 SecurityException 失败 —— 这正是要验证的边界。",
+            "预期：没有系统权限时，「创建虚拟屏」能成功；「启动抖音到虚拟屏」「向该屏滑动」会以 SecurityException 失败。" +
+            "装上 Shizuku、启动它的服务并在这里授权之后，这两步改由 Shizuku 以 shell 身份执行（和电脑 adb 同一档权限）。",
             fontSize = 12.sp, lineHeight = 17.sp,
         )
     }

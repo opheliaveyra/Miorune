@@ -321,6 +321,19 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!--
+            虚拟屏探针用：Shizuku 的 provider。装上 Shizuku、启动它的服务并在这里授权之后，
+            这个 App 才能以 shell 身份执行 am/input 这类命令（普通权限做不到）。
+            没装 Shizuku 时它不会被调用，也不影响别的功能。
+        -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
         <service
             android:name=".ReplyKeeper"
             android:exported="false"
